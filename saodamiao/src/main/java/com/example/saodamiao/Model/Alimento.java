@@ -9,6 +9,7 @@ public class Alimento {
     private String nome;
     private long tipo_alimento_id;
     AlimentoDAO alimentoDAO;
+
     public Alimento(){
         alimentoDAO = new AlimentoDAO();
     }
