@@ -1,12 +1,41 @@
-const tam_pagina = 6;
+const tam_pagina = 5;
 const estado_pag = {
     dados : [],
     pagina_atual: 0,
     qtd_max_pag : 0
 }
+estado_pag.todos = [];
+estado_pag.filtro = '';
+estado_pag.sort = { campo: null, dir: 'asc' };
+
+const normalizar = (s) => (s ?? '')
+    .toString()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '');
+
+const debounce = (fn, ms = 0) => {
+    let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+};
+
 document.addEventListener('DOMContentLoaded',()=>{
     const link = document.getElementById('consultar-alimento');
     const main = document.getElementById('app-content');
+
+    const modalConfHTML = `
+<div class="modal fade" id="modal-confirma" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <div class="modal-body">
+        <p id="modal-confirma-msg" class="mb-0">Tem certeza?</p>
+      </div>
+      <div class="modal-footer">
+        <button id="modal-confirma-nao" type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+        <button id="modal-confirma-sim" type="button" class="btn btn-danger">Excluir</button>
+      </div>
+    </div>
+  </div>
+</div>`;
 
 const telaConsulta= `
 <section class="container py-4 min-vh-100 d-flex align-items-center">
@@ -38,21 +67,15 @@ const telaConsulta= `
             <table id="tabela-alimentos" class="table table-hover align-middle">
               <thead class="table-light">
                 <tr>
-                  <th scope="col" style="width: 45%">Nome</th>
-                  <th scope="col" style="width: 45%">Tipo de Alimento</th>
+                  <th scope="col" style="width: 45%; cursor: pointer;" data-sort="nome" class="sortable">Nome<span class="sort-indicator"></span></th>
+                  <th scope="col" style="width: 45%; cursor: pointer;"data-sort="tipo_alimento" class="sortable">Tipo de Alimento<span class="sort-indicator"></span></th>
                   <th scope="col" class="text-end" style="width: 10%">Ações</th>
                 </tr>
               </thead>
               <tbody id="lista-alimentos">              
               </tbody>
             </table>
-          </div>
-
-          <!-- Rodapé opcional (paginação futura) -->
-          <div id="paginacao-alimentos" class="d-flex justify-content-end gap-2 mt-2 d-none">
-            <button class="btn btn-sm btn-outline-secondary" data-pagina="prev">Anterior</button>
-            <button class="btn btn-sm btn-outline-secondary" data-pagina="next">Próxima</button>
-          </div>
+          </div> 
         </div>
       </div>
     </div>
@@ -66,6 +89,211 @@ const telaConsulta= `
         return await response.json();
     }
 
+    function aplicarFiltroOrdenacao() {
+        const base = (estado_pag.todos?.length ? estado_pag.todos : estado_pag.dados) || [];
+        const txt = normalizar(estado_pag.filtro);
+
+        let arr = !txt ? base.slice() : base.filter(it => {
+            const n = normalizar(it?.nome);
+            const t = normalizar(it?.tipo_alimento);
+            return n.includes(txt) || t.includes(txt);
+        });
+
+        const { campo, dir } = estado_pag.sort || {};
+        if (campo) {
+            arr.sort((a, b) => {
+                const va = normalizar(a?.[campo]);
+                const vb = normalizar(b?.[campo]);
+                if (va < vb) return dir === 'asc' ? -1 : 1;
+                if (va > vb) return dir === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        estado_pag.dados = arr;
+        estado_pag.qtd_max_pag = Math.ceil(arr.length / tam_pagina);
+        if (estado_pag.pagina_atual > Math.max(estado_pag.qtd_max_pag - 1, 0)) {
+            estado_pag.pagina_atual = 0;
+        }
+
+        carregarPagina();
+        atualizarIndicadoresOrdenacao();
+    }
+
+    function setOrdenacao(campo) {
+        if (estado_pag.sort.campo === campo) {
+            estado_pag.sort.dir = estado_pag.sort.dir === 'asc' ? 'desc' : 'asc';
+        } else {
+            estado_pag.sort.campo = campo;
+            estado_pag.sort.dir = 'asc';
+        }
+        aplicarFiltroOrdenacao();
+    }
+
+    function atualizarIndicadoresOrdenacao() {
+        document.querySelectorAll('th.sortable').forEach(th => {
+            const span = th.querySelector('.sort-indicator');
+            if (!span) return;
+            if (estado_pag.sort.campo === th.dataset.sort) {
+                span.textContent = estado_pag.sort.dir === 'asc' ? ' ▲' : ' ▼';
+            } else {
+                span.textContent = '';
+            }
+        });
+    }
+
+    function setupFiltroOrdenacaoListeners() {
+        const input = document.getElementById('filtro-nome');
+        const limpar = document.getElementById('btn-limpar-filtro');
+
+        if (input && !input.dataset.ready) {
+            input.dataset.ready = '1';
+            input.addEventListener('input', debounce((e) => {
+                estado_pag.filtro = e.target.value || '';
+                estado_pag.pagina_atual = 0;
+                aplicarFiltroOrdenacao();
+            }, 250));
+        }
+
+        if (limpar && !limpar.dataset.ready) {
+            limpar.dataset.ready = '1';
+            limpar.addEventListener('click', () => {
+                if (input) input.value = '';
+                estado_pag.filtro = '';
+                estado_pag.pagina_atual = 0;
+                aplicarFiltroOrdenacao();
+            });
+        }
+
+        document.querySelectorAll('th.sortable').forEach(th => {
+            if (!th.dataset.ready) {
+                th.dataset.ready = '1';
+                th.addEventListener('click', () => {
+                    const campo = th.dataset.sort;
+                    if (campo) setOrdenacao(campo);
+                });
+            }
+        });
+    }
+
+
+    const modalEditarHTML = `
+<div class="modal fade" id="modal-editar-alimento" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <form id="form-editar-alimento">
+        <div class="modal-header">
+          <h5 class="modal-title">Editar alimento</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+
+        <div class="modal-body">
+          <input type="hidden" id="edit-id">
+          <div class="mb-3">
+            <label for="edit-nome" class="form-label">Nome</label>
+            <input type="text" id="edit-nome" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label for="edit-tipo" class="form-label">Tipo de alimento</label>
+            <input type="text" id="edit-tipo" class="form-control" required>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-light" type="button" data-bs-dismiss="modal">Cancelar</button>
+          <button class="btn btn-primary" type="submit" id="alterar-salvar">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+`;
+
+    function montarModal(tr, data, idx){
+
+        const el = document.getElementById('modal-editar-alimento');
+
+        const editnome = document.getElementById('edit-nome');
+        const edittipo = document.getElementById('edit-tipo');
+
+        const nomeAtual = data?.nome ?? tr.cells[0]?.textContent?.trim() ?? '';
+        const tipoAtual = data?.tipo_alimento ?? tr.cells[1]?.textContent?.trim() ?? '';
+        editnome.value = nomeAtual;
+        edittipo.value = tipoAtual;
+        bootstrap.Modal.getOrCreateInstance(el).show();
+
+        const form = document.getElementById('form-editar-alimento');
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const novoNome = editnome.value.trim();
+            const novoTipo = edittipo.value.trim();
+
+
+            const alimentoDTO = { ...(data || {}), nome: novoNome, tipo_alimento: novoTipo };
+
+
+            const payload = {
+                alimentoDTO,
+                nome: nomeAtual
+            };
+
+            try {
+                const url = 'http://localhost:8080/apis/alimentos/atualizar';
+                const resp = await fetch(url, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!resp.ok) throw new Error(await resp.text());
+
+
+                const atualizado = await resp.json().catch(() => alimentoDTO);
+                estado_pag.dados[idx] = alimentoDTO;
+                console.log(idx);
+                console.log(estado_pag.dados);
+                carregarPagina();
+                // re-render da tabela/página atual (use seu renderizador)
+                //if (typeof renderPaginaAtual === 'function') renderPaginaAtual();
+
+                // fecha modal
+                bootstrap.Modal.getInstance(el)?.hide();
+            } catch (err) {
+                alert(`Erro ao atualizar: ${err.message || err}`);
+            }
+        }, { once: true })
+
+    }
+
+    async function deletar(data, idx){
+
+        const ok = await confirmar(`Excluir "${data.nome}"?`);
+        if (!ok)
+            return;
+
+
+        try{
+            const url = 'http://localhost:8080/apis/alimentos/deletar';
+            const resp = await fetch(url, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (!resp.ok) throw new Error(await resp.text());
+
+            estado_pag.dados.splice(idx, 1);
+            estado_pag.qtd_max_pag = Math.ceil(estado_pag.dados.length / tam_pagina);
+            if(estado_pag.dados.length % tam_pagina == 0)
+                estado_pag.pagina_atual--;
+            carregarPagina();
+
+        } catch (err) {
+            alert(`Erro ao deletar: ${err.message || err}`);
+        }
+
+    }
+
     async function insereAlimentosTabela() {
         const table = document.getElementById('lista-alimentos');
 
@@ -76,6 +304,7 @@ const telaConsulta= `
                 (Array.isArray(conteudo?.content) ? conteudo.content : []);
 
             estado_pag.dados = data;
+            estado_pag.todos = data.slice();
             estado_pag.qtd_max_pag = Math.ceil(data.length / tam_pagina);
             if (!data.length) {
                 const tr = document.createElement('tr');
@@ -130,8 +359,8 @@ const telaConsulta= `
             nav.appendChild(span);
             nav.appendChild(btn('»', true));
             carregarPagina();
-
-
+            setupFiltroOrdenacaoListeners();
+            atualizarIndicadoresOrdenacao();
         } catch (err) {
             console.error(err);
             const tr = document.createElement('tr');
@@ -143,44 +372,51 @@ const telaConsulta= `
             table.appendChild(tr);
         }
 
+    }
 
-        function carregarPagina() {
-            const table = document.getElementById('lista-alimentos');
+    function carregarPagina() {
+        const table = document.getElementById('lista-alimentos');
 
-            while (table.firstChild) table.removeChild(table.firstChild);
+        while (table.firstChild) table.removeChild(table.firstChild);
 
-            const colunas = ['nome', 'tipo_alimento'];
+        const colunas = ['nome', 'tipo_alimento'];
 
-            let pos = estado_pag.pagina_atual * tam_pagina; // indice de 0...x
-            let aux = pos;
-            for (; pos < aux + tam_pagina; pos++) {
-                let cont = estado_pag.dados[pos];
-                if(cont == null)
-                    break;
-                const tr = document.createElement('tr');
-                colunas.forEach(cols => {
-                    const td = document.createElement('td');
-                    const cnt = cont?.[cols];
-                    td.textContent = cnt == null ? "" : cnt;
-                    tr.appendChild(td);
-                })
-                const divaux = document.createElement('div');
+        let pos = estado_pag.pagina_atual * tam_pagina; // indice de 0...x
+        let aux = pos;
+        for (; pos < aux + tam_pagina; pos++) {
+            const idx = pos;
+            let cont = estado_pag.dados[pos];
+            if(cont == null)
+                break;
+            const tr = document.createElement('tr');
+            colunas.forEach(cols => {
                 const td = document.createElement('td');
-                const buttonAlterar = criarBotaoAlterar(pos);
-                const buttonApagar = criarBotaoExcluir(pos);
-                divaux.appendChild(buttonAlterar);
-                divaux.appendChild(buttonApagar);
-                divaux.className = 'd-flex align-items-center gap-2';
-                td.appendChild(divaux);
-
+                const cnt = cont?.[cols];
+                td.textContent = cnt == null ? "" : cnt;
                 tr.appendChild(td);
+            })
+            const divaux = document.createElement('div');
+            const td = document.createElement('td');
+            const buttonAlterar = criarBotaoAlterar(pos);
+            buttonAlterar.addEventListener('click', () => {
+                montarModal(tr, cont, idx);
+            })
+            const buttonApagar = criarBotaoExcluir(pos);
+            buttonApagar.addEventListener('click', () => {
+                deletar(cont,idx);
+            })
+            divaux.appendChild(buttonAlterar);
+            divaux.appendChild(buttonApagar);
+            divaux.className = 'd-flex align-items-center gap-2';
+            td.appendChild(divaux);
 
-                table.appendChild(tr);
-            }
-            const span = document.getElementById('qtd-pagina');
-            span.textContent = `Página ${estado_pag.pagina_atual + 1} de ${estado_pag.qtd_max_pag}`;
+            tr.appendChild(td);
 
+            table.appendChild(tr);
         }
+        const span = document.getElementById('qtd-pagina');
+        span.textContent = `Página ${estado_pag.pagina_atual + 1} de ${estado_pag.qtd_max_pag}`;
+
     }
 
     function criarBotaoAlterar(id) {
@@ -209,9 +445,35 @@ const telaConsulta= `
         return btn;
     }
 
+    function confirmar(msg) {
+        const el = document.getElementById('modal-confirma');
+        document.getElementById('modal-confirma-msg').textContent = msg;
+        const modal = bootstrap.Modal.getOrCreateInstance(el);
+
+        return new Promise((resolve) => {
+            const yes = document.getElementById('modal-confirma-sim');
+            const no  = document.getElementById('modal-confirma-nao');
+
+            const done = (val) => {
+                yes.onclick = null; no.onclick = null;
+                el.removeEventListener('hidden.bs.modal', onHide);
+                modal.hide(); resolve(val);
+            };
+            const onHide = () => done(false);
+
+            yes.onclick = () => done(true);
+            no.onclick  = () => done(false);
+            el.addEventListener('hidden.bs.modal', onHide, { once: true });
+
+            modal.show();
+        });
+    }
+
     link.addEventListener('click', (e) => {
         e.preventDefault();
         main.innerHTML = telaConsulta;
+        main.insertAdjacentHTML('beforeend', modalEditarHTML);
+        main.insertAdjacentHTML('beforeend', modalConfHTML);
         insereAlimentosTabela();
     })
 
