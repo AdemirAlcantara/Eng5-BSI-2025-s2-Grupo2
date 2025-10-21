@@ -1,6 +1,7 @@
 package com.example.saodamiao.Control;
 
 import com.example.saodamiao.DTO.AlimentoDTO;
+import com.example.saodamiao.DTO.AlimentoRequest;
 import com.example.saodamiao.Model.Alimento;
 import com.example.saodamiao.Singleton.Erro;
 import com.example.saodamiao.Singleton.Singleton;
@@ -34,17 +35,35 @@ public class AlimentoControl {
     }
 
     @PutMapping(value = "/atualizar")
-    public ResponseEntity<Object> AtualizarAlimento(@RequestBody AlimentoDTO alimentoDTO){
+    public ResponseEntity<Object> AtualizarAlimento(@RequestBody AlimentoRequest  alimentoRequest) {
+        Alimento alimento = alimentoRequest.alimentoDTO().toAlimento();
 
+        if(!Singleton.Retorna().StartTransaction())
+            return ResponseEntity.status(500).body(new Erro(Singleton.Retorna().getMensagemErro()));
 
-        return null;
+        if(!alimento.getAlimentoDAO().alterar(alimento,alimentoRequest.nome(), Singleton.Retorna())) {
+            Singleton.Retorna().Rollback();
+            return ResponseEntity.badRequest().body(new Erro(""+Singleton.Retorna().getMensagemErro()));
+        }
+        Singleton.Retorna().Commit();
+        return ResponseEntity.ok(alimentoRequest);
+
     }
 
     @DeleteMapping(value = "/deletar")
     public ResponseEntity<Object> DeletarAlimento(@RequestBody AlimentoDTO alimentoDTO){
-        Singleton.Retorna().StartTransaction();
+        Alimento alimento = alimentoDTO.toAlimento();
 
-        return null;
+        if(!Singleton.Retorna().StartTransaction())
+            return ResponseEntity.status(500).body(new Erro(Singleton.Retorna().getMensagemErro()));
+
+        if(!alimento.getAlimentoDAO().apagar(alimento,Singleton.Retorna())) {
+            Singleton.Retorna().Rollback();
+            return ResponseEntity.badRequest().body(new Erro(""+Singleton.Retorna().getMensagemErro()));
+        }
+        Singleton.Retorna().Commit();
+
+        return ResponseEntity.ok(alimentoDTO);
     }
 
     @GetMapping(value = "/getall")

@@ -2,11 +2,14 @@ class ParametrizacaoDTO {
 
     constructor(data) {
 
-        this.social = data.par_razao_social;
-        this.fantasia = data.par_nome_fantasia;
-        this.email = data.par_email;
+        this.par_razao_social = data.par_razao_social;
+        this.par_nome_fantasia = data.par_nome_fantasia;
+        this.par_telefone = data.par_telefone;
+        this.par_email = data.par_email;
+        this.par_bairro = data.par_bairro;
+        this.par_rua = data.par_rua;
         this.logo_grande = data.par_logo_grande;
-        this.logo_pequeno = data.logo_pequeno;
+        this.par_logo_pequeno = data.par_logo_pequeno;
     }
 }
 async function carregarParametrizacao() {
@@ -39,9 +42,13 @@ async function carregarParametrizacao() {
 
 function CarregarEmpresa(Parametros)
 {
+    document.getElementById('id-tel').textContent = Parametros.par_telefone;
+    document.getElementById('id-email').textContent = Parametros.par_email;
+    document.getElementById('id-bairro').textContent = Parametros.par_bairro;
+    document.getElementById('id-rua').textContent = Parametros.par_rua;
     document.getElementById('img-logo').src = Parametros.logo_grande;
-    document.getElementById('nome-ong').textContent = Parametros.fantasia;
-
+    document.getElementById('nome-ong').textContent = Parametros.par_nome_fantasia;
+    //document.getElementById('img-pequena').src = Parametros.par_logo_pequeno
 }
 
 function abrirCadastro()

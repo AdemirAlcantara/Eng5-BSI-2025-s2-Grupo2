@@ -1,11 +1,9 @@
 package com.example.saodamiao.Model;
 
-import com.example.saodamiao.DAO.CaixaDAO;
-
 import java.util.Date;
 
-
 public class CaixaModel {
+
     private int idCaixa;
     private Date dataAbertura;
     private Double valorAbertura;
@@ -14,19 +12,22 @@ public class CaixaModel {
     private Double valorFechamento;
     private int loginFechamento;
 
-    private CaixaDAO caixa;
+    public CaixaModel() {}
 
-    public CaixaModel(int idCaixa, Date dataAbertura, Double valorAbertura, int loginAbertura, Date dataFechamento, Double valorFechamento, int loginFechamento) {
-        this.idCaixa = idCaixa;
-        this.dataAbertura = dataAbertura;
-        this.valorAbertura = valorAbertura;
-        this.loginAbertura = loginAbertura;
-        this.dataFechamento = dataFechamento;
-        this.valorFechamento = valorFechamento;
-        this.loginFechamento = loginFechamento;
+    public static CaixaModel criarAbertura(int idVoluntario, double valorAbertura) {
+        CaixaModel caixa = new CaixaModel();
+        caixa.dataAbertura = new Date();
+        caixa.valorAbertura = valorAbertura;
+        caixa.loginAbertura = idVoluntario;
+        return caixa;
     }
 
-    public CaixaModel(int anInt) {
+    public static CaixaModel criarFechamento(int idVoluntario, double valorFechamento) {
+        CaixaModel caixa = new CaixaModel();
+        caixa.dataFechamento = new Date();
+        caixa.valorFechamento = valorFechamento;
+        caixa.loginFechamento = idVoluntario;
+        return caixa;
     }
 
     public int getIdCaixa() {
@@ -85,10 +86,6 @@ public class CaixaModel {
         this.loginFechamento = loginFechamento;
     }
 
-    public Boolean atualizarCaixa(int qtde, int idCaixa){
-        caixa = new CaixaDAO();
-        return caixa.atualizarValorCaixa(qtde, idCaixa);
-    }
     @Override
     public String toString() {
         return "CaixaModel{" +
