@@ -90,7 +90,7 @@ create table tipo_bazar (
 );
 
 create table tipo_cesta_basica (
-  idcestas_basicas int not null,
+  idcestas_basicas int not null DEFAULT nextval('seq_tipo_cesta_basica'),
   tamanho varchar(20) not null,
   primary key (idcestas_basicas)
 );
