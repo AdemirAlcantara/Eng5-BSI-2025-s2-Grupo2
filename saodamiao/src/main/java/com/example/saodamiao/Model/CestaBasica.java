@@ -10,7 +10,7 @@ import java.util.List;
 public class CestaBasica {
     private int id;
     private String tamanho;
-    private List<ItensCesta> itens;
+    private List<ItemCesta> itens;
     CestaBasicaDAO cestaBasicaDAO;
 
     public CestaBasica() {
