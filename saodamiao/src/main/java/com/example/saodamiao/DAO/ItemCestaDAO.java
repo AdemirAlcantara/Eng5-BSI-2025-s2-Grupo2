@@ -16,7 +16,7 @@ public class ItemCestaDAO implements IDAO<ItemCesta>{
 
     @Override
     public boolean gravar(ItemCesta entidade, Conexao conexao) {
-        String sql = "INSERT INTO itens_cesta VALUES (cestas_basicas_idcestas_basicas, alimentos_idalimentos, qtde) VALUES (#1, #2, #3)";
+        String sql = "INSERT INTO itens_cesta (cestas_basicas_idcestas_basicas, alimentos_idalimentos, qtde) VALUES (#1, #2, #3)";
         sql = sql.replace("#1", String.valueOf(entidade.getCesta().getId()));
         sql = sql.replace("#2", String.valueOf(entidade.getAlimento().getId()));
         sql = sql.replace("#3", String.valueOf(entidade.getQtde()));
@@ -25,15 +25,11 @@ public class ItemCestaDAO implements IDAO<ItemCesta>{
 
     @Override
     public boolean alterar(ItemCesta entidade, int id, Conexao conexao){
-        return false;
-    }
-
-    public boolean alterarQtde(ItemCesta entidade, Conexao conexao) {
         String sql = "UPDATE itens_cesta SET qtde = #1 WHERE cestas_basicas_idcestas_basicas = #2 AND alimentos_idalimentos = #3";
         sql = sql.replace("#1", String.valueOf(entidade.getQtde()));
         sql = sql.replace("#2", String.valueOf(entidade.getCesta().getId()));
         sql = sql.replace("#3", String.valueOf(entidade.getAlimento().getId()));
-        return  conexao.manipular(sql);
+        return conexao.manipular(sql);
     }
 
     @Override
@@ -47,20 +43,53 @@ public class ItemCestaDAO implements IDAO<ItemCesta>{
     @Override
     public List<ItemCesta> pegarListaToda(Conexao conexao) {
         String sql = "SELECT ic.*, " +
-                     "a.nome as alimento_nome, " +
-                     "a.tipo_alimento_tpa_id as alimento_tipo_id, " +
-                     "tcb.tamanho " +
-                     "FROM itens_cesta ic " +
-                     "JOIN alimentos a ON ic.alimentos_idalimentos = a.idalimentos " +
-                     "JOIN tipo_cesta_basica tcb ON ic.idcestas_basicas = tcb.idcestas_basicas";
+                "a.nome as alimento_nome, " +
+                "a.tipo_alimento_tpa_id as alimento_tipo_id, " +
+                "tcb.tamanho " +
+                "FROM itens_cesta ic " +
+                "JOIN alimentos a ON ic.alimentos_idalimentos = a.idalimentos " +
+                "JOIN tipo_cesta_basica tcb ON ic.cestas_basicas_idcestas_basicas = tcb.idcestas_basicas";
+
         List<ItemCesta> itensCestas = new ArrayList<>();
-        try{
+        try {
             ResultSet rs = conexao.consultar(sql);
-            while(rs.next())
-                itensCestas.add(new ItemCesta(new CestaBasica(rs.getInt("cestas_basicas_idcestas_basicas"), rs.getString("tamanho")), new Alimento(rs.getInt("alimentos_idalimentos"), rs.getString("nome"), rs.getInt("alimento_tipo_id")), rs.getInt("qtde")));
+            while (rs.next()) {
+                itensCestas.add(new ItemCesta(
+                        new CestaBasica(rs.getInt("cestas_basicas_idcestas_basicas"), rs.getString("tamanho")),
+                        new Alimento(rs.getInt("alimentos_idalimentos"), rs.getString("alimento_nome"), rs.getInt("alimento_tipo_id")),
+                        rs.getInt("qtde")
+                ));
+            }
             rs.close();
+        } catch (SQLException sqlException) {
+            throw new RuntimeException(sqlException);
         }
-        catch(SQLException sqlException){
+        return itensCestas;
+    }
+
+    public List<ItemCesta> buscarItensCesta(int idCesta, Conexao conexao) {
+        String sql = "SELECT ic.*, " +
+                "a.nome as alimento_nome, " +
+                "a.tipo_alimento_tpa_id as alimento_tipo_id, " +
+                "tcb.tamanho " +
+                "FROM itens_cesta ic " +
+                "JOIN alimentos a ON ic.alimentos_idalimentos = a.idalimentos " +
+                "JOIN tipo_cesta_basica tcb ON ic.cestas_basicas_idcestas_basicas = tcb.idcestas_basicas " +
+                "WHERE ic.cestas_basicas_idcestas_basicas = #1";
+        sql = sql.replace("#1", String.valueOf(idCesta));
+
+        List<ItemCesta> itensCestas = new ArrayList<>();
+        try {
+            ResultSet rs = conexao.consultar(sql);
+            while (rs.next()) {
+                itensCestas.add(new ItemCesta(
+                        new CestaBasica(rs.getInt("cestas_basicas_idcestas_basicas"), rs.getString("tamanho")),
+                        new Alimento(rs.getInt("alimentos_idalimentos"), rs.getString("alimento_nome"), rs.getInt("alimento_tipo_id")),
+                        rs.getInt("qtde")
+                ));
+            }
+            rs.close();
+        } catch (SQLException sqlException) {
             throw new RuntimeException(sqlException);
         }
         return itensCestas;

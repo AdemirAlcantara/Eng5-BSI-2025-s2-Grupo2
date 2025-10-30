@@ -18,12 +18,11 @@ public class CestaBasicaDTO {
 
     public CestaBasica toCestaBasica() {
         CestaBasica cesta = new CestaBasica();
-        cesta.setTamanho(tamanho);
-        if(itens != null && !itens.isEmpty()) {
+        cesta.setTamanho(this.tamanho);
+        if (this.itens != null && !this.itens.isEmpty()) {
             List<ItemCesta> itensModel = new ArrayList<>();
-            for (ItemCestaDTO itemDTO : itens) {
-                ItemCesta item = itemDTO.toItemCesta();
-                item.setCesta(cesta);
+            for (ItemCestaDTO itemDTO : this.itens){
+                ItemCesta item = itemDTO.toItemCesta(cesta);
                 itensModel.add(item);
             }
             cesta.setItens(itensModel);
