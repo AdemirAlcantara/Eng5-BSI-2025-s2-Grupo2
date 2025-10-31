@@ -51,25 +51,37 @@ public class CestaBasicaControl {
     @PutMapping(value = "/atualizar")
     public ResponseEntity<Object> atualizarCesta(@RequestBody CestaBasicaRequest cestaRequest) {
         CestaBasica cesta = cestaRequest.cestaDTO().toCestaBasica();
-
-        // Busca a cesta existente pelo tamanho atual para obter o ID
         List<CestaBasica> cestasExistentes = cesta.getCestaBasicaDAO().buscarPorTamanho(cestaRequest.tamanhoAtual(), Singleton.Retorna());
-
         if (cestasExistentes.isEmpty()) {
             return ResponseEntity.badRequest().body(new Erro("Cesta não encontrada"));
         }
-
         int idCesta = cestasExistentes.getFirst().getId();
-
+        cesta.setId(idCesta);
         if (!Singleton.Retorna().StartTransaction()) {
             return ResponseEntity.status(500).body(new Erro(Singleton.Retorna().getMensagemErro()));
         }
-
-        if (!cesta.getCestaBasicaDAO().alterar(cesta, idCesta, Singleton.Retorna())) {
-            Singleton.Retorna().Rollback();
-            return ResponseEntity.badRequest().body(new Erro(Singleton.Retorna().getMensagemErro()));
+        if (!cestaRequest.tamanhoAtual().equals(cestaRequest.cestaDTO().getTamanho())) {
+            if (!cesta.getCestaBasicaDAO().alterar(cesta, idCesta, Singleton.Retorna())) {
+                Singleton.Retorna().Rollback();
+                return ResponseEntity.badRequest().body(new Erro("Erro ao atualizar cesta"));
+            }
         }
-
+        ItemCesta itemTemp = new ItemCesta();
+        List<ItemCesta> itensAntigos = itemTemp.getItemCestaDAO().buscarItensCesta(idCesta, Singleton.Retorna());
+        for (ItemCesta itemAntigo : itensAntigos) {
+            if (!itemAntigo.getItemCestaDAO().apagar(itemAntigo, Singleton.Retorna())) {
+                Singleton.Retorna().Rollback();
+                return ResponseEntity.badRequest().body(new Erro("Erro ao remover itens antigos"));
+            }
+        }
+        if (cesta.getItens() != null && !cesta.getItens().isEmpty()) {
+            for (ItemCesta item : cesta.getItens()) {
+                if (!item.getItemCestaDAO().gravar(item, Singleton.Retorna())) {
+                    Singleton.Retorna().Rollback();
+                    return ResponseEntity.badRequest().body(new Erro("Erro ao adicionar novos itens"));
+                }
+            }
+        }
         Singleton.Retorna().Commit();
         return ResponseEntity.ok(cestaRequest);
     }

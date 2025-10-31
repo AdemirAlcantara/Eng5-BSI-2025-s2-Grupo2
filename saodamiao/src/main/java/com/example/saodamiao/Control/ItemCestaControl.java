@@ -97,7 +97,7 @@ public class ItemCestaControl {
         return ResponseEntity.ok(itemRequest.getItemDTO());
     }
 
-    @PostMapping(value = "/getbycesta")
+    @PostMapping(value = "/lista-cesta")
     public ResponseEntity<Object> getItensPorCesta(@RequestBody ItemCestaBuscaRequest buscaRequest) {
         CestaBasica cesta = new CestaBasica();
         List<CestaBasica> cestas = cesta.getCestaBasicaDAO().buscarPorTamanho(buscaRequest.getTamanhoCesta(), Singleton.Retorna());
